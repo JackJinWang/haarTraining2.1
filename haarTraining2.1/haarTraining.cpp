@@ -1052,7 +1052,7 @@ void saveXML(CvIntHaarFeatures* haarFeatures,int stage,vector<MyStumpClassifier>
 			
 			sprintf(rectStr, "%d %d %d %d %f", haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p0, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p1,
 					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p2, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p3,
-					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].weight);						
+					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].weight);		  				
 			rect->SetText(rectStr);
 			haarRect->InsertEndChild(rect);
 
