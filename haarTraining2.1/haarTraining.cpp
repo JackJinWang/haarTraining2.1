@@ -1045,19 +1045,17 @@ void saveXML(CvIntHaarFeatures* haarFeatures,int stage,vector<MyStumpClassifier>
 		
 		for (int k = 0;k < CV_HAAR_FEATURE_MAX;k++)
 		{
-			stringstream ss;
-			ss << k;// int->string
-			string str = ss.str();
-			if (!ss.good())
-			{
-				printf("矩形id转换错误\n");
-			}
-			XMLElement* rect = doc.NewElement(str.c_str());
+
+			char rect_name[100];
+			sprintf(rect_name, "rect_%d",k);
+			XMLElement* rect = doc.NewElement(rect_name);
+			
 			sprintf(rectStr, "%d %d %d %d %f", haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p0, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p1,
 					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p2, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p3,
-					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].weight);
+					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].weight);						
 			rect->SetText(rectStr);
 			haarRect->InsertEndChild(rect);
+
 
 		}
 		
@@ -1348,8 +1346,16 @@ MyCARTClassifier readXML(const char* xmlPath, MyCARTClassifier &strongClassifier
 			//	cout << surfaceChild->Name() << " = " << surfaceChild->GetText() << endl;
 			if (strcmp(surfaceChild->Name(), HAARFEATUR) == 0)
 			{
-				tempWeak.compidx = atoi(surfaceChild->GetText());
-		
+			//	tempWeak.compidx = atoi(surfaceChild->GetText());
+				XMLElement* surfaceSun = surfaceChild->FirstChildElement();
+				while (surfaceSun)
+				{
+					if (strcmp(surfaceSun->Name(), NUMBER) == 0)
+					{
+						tempWeak.compidx = atoi(surfaceSun->GetText());
+						break;
+					}
+				}
 				
 			}
 			else if (strcmp(surfaceChild->Name(), ERRORER) == 0)
@@ -2044,7 +2050,7 @@ void icvReleaseBackgroundData(CvBackgroundData** data)
 *合并xml
 */
 static 
-void combineXml(int equalweights, int npos, int nneg,float minhitrate, float maxfalsealarm, const char* dirname,MySize winsize)
+void combineXml(CvIntHaarFeatures* haarFeatures,int equalweights, int npos, int nneg,float minhitrate, float maxfalsealarm, const char* dirname,MySize winsize)
 {
 	XMLDocument doc2;
 	MyCARTClassifier *strongClassifier = NULL;//强分类器
@@ -2105,7 +2111,30 @@ void combineXml(int equalweights, int npos, int nneg,float minhitrate, float max
 			root->InsertEndChild(sonElement);
 			XMLElement* sunElement1 = doc2.NewElement("haarfeature");
 
-			sunElement1->SetText(weakClassifier.compidx);
+			XMLElement* haarDesc = doc2.NewElement("desc");
+			haarDesc->SetText(haarFeatures->feature[weakClassifier.compidx].desc);
+			sunElement1->InsertEndChild(haarDesc);
+			XMLElement* haarRect = doc2.NewElement("rect");
+
+			for (int k = 0;k < CV_HAAR_FEATURE_MAX;k++)
+			{
+
+				char rect_name[100];
+				sprintf(rect_name, "rect_%d", k);
+				XMLElement* rect = doc2.NewElement(rect_name);			
+				sprintf(rectStr, "%d %d %d %d %f", haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p0, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p1,
+					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p2, haarFeatures->fastfeature[weakClassifier.compidx].rect[k].p3,
+					haarFeatures->fastfeature[weakClassifier.compidx].rect[k].weight);
+				rect->SetText(rectStr);
+				haarRect->InsertEndChild(rect);
+
+			}
+
+			sunElement1->InsertEndChild(haarRect);
+			XMLElement* haarTitle = doc2.NewElement("titled");
+			haarTitle->SetText(haarFeatures->feature[weakClassifier.compidx].tilted);
+			sunElement1->InsertEndChild(haarTitle);
+			//sunElement1->SetText(weakClassifier.compidx);
 			sonElement->InsertEndChild(sunElement1);
 
 			XMLElement* sunElement2 = doc2.NewElement("error");
@@ -2213,7 +2242,7 @@ void myHaarTraining(const char* dirname,
 		icvBoost(maxtreesplits, nstages, haar_features, training_data,
 			featuredir, dirname, npos, nneg, numsplits, equalweights, dirname,minhitrate,maxfalsealarm,winsize, numprecalculated);
 	
-	combineXml(equalweights,npos,  nneg,  minhitrate, maxfalsealarm,dirname, winsize);
+	combineXml(haar_features,equalweights,npos,  nneg,  minhitrate, maxfalsealarm,dirname, winsize);
 
 	_MY_END_
 	if (cvbgdata != NULL)
