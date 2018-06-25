@@ -6,6 +6,7 @@ using namespace tinyxml2;
 #include<string>
 #include <ctype.h>
 #include<time.h>
+#include<omp.h>
 #include <math.h>
 #include"myIntergal.h"
 #include"delete.h"
@@ -31,6 +32,7 @@ using namespace std;
 #define POSISOVER 1
 #define NEGISOVER 2
 #define REPLACESUCCESSFUL 3
+#define THREAD_NUMBER 8
 /*
 * get sum image offsets for <rect> corner points
 * step - row step (measured in image pixels!) of sum image
@@ -913,6 +915,8 @@ static
 void icvPrecalculate(int stage,int num_samples,CvHaarTrainingData* data, CvIntHaarFeatures* haarFeatures,
 	int numprecalculated,int fileOrMem,const char* filedirname)
 {
+	int *valarry = new int[num_samples];
+	int *idxarry = new int[num_samples];
 	switch (fileOrMem)
 	{
 	//存入内存计算
@@ -930,8 +934,7 @@ void icvPrecalculate(int stage,int num_samples,CvHaarTrainingData* data, CvIntHa
 		sprintf(idxfileName, "%s//idx%d.dat", filedirname, stage);
 		file.open(fileName, ios::out|ios::app|ios::binary);
 		idxfile.open(idxfileName, ios::out | ios::app | ios::binary);
-		int *valarry = new int[num_samples];
-		int *idxarry = new int[num_samples];
+
 		for (int i = 0; i < haarFeatures->count; i++)
 		{
 			for (int j = 0; j < num_samples; j++)
@@ -962,22 +965,23 @@ void icvPrecalculate(int stage,int num_samples,CvHaarTrainingData* data, CvIntHa
 		}
 
 		int val = 0;
-		int *valarry = new int[num_samples];
-		int *idxarry = new int[num_samples];
 		for (int i = 0; i < haarFeatures->count; i++)
 		{
+
 			for (int j = 0; j < num_samples; j++)
 			{
 				data->valcache->data.i[i * data->valcache->width + j] = cvEvalFastHaarFeature(haarFeatures->fastfeature + i, data->sum.data.i + j * data->sum.width, data->sum.data.i);
-				data->idxcache->data.i[i * data->valcache->width + j] = j;
+				data->idxcache->data.i[i * data->idxcache->width + j] = j;
 			}
-			quickSort(data->valcache->data.i, data->idxcache->data.i, 0, num_samples - 1);
+			quickSort(&data->valcache->data.i[i * data->valcache->width], &data->idxcache->data.i[i * data->idxcache->width], 0, num_samples - 1);
 		}
 		break;
 	}
 	default:
 		break;
 	}
+	delete[]valarry;
+	delete[]idxarry;
 }
 /*
 *更新权重
@@ -1579,7 +1583,11 @@ void icvBoost(int maxweaksplits, int stage_all, CvIntHaarFeatures* haarFeatures,
 								threArray.push_back(vector_feat[ii + 1]);
 							}
 						}
-						//弱分类器训练
+//弱分类器训练
+#ifdef _OPENMP
+	omp_set_num_threads(THREAD_NUMBER);         //开启并行计算
+#pragma omp parallel for
+#endif // _OPENMP
 						for (int k = 0;k < threArray.size() - 1;k++)
 						{
 							//循环默认阈值左侧为1，右侧为0 即 左侧人脸
@@ -1856,6 +1864,10 @@ void icvBoostInMem(int maxweaksplits, int stage_all, CvIntHaarFeatures* haarFeat
 			int end_num = sampleNumber - 1;
 			int vector_count_above = 10 * sampleNumber;
 			int nIdxRead;
+#ifdef _OPENMP
+			omp_set_num_threads(THREAD_NUMBER);         //开启并行计算
+#pragma omp parallel for
+#endif // _OPENMP
 			for(int weakLine = 0;weakLine < haarFeatures->count;weakLine++)
 			{
 				   //读入一组特征
